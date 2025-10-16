@@ -35,6 +35,22 @@ def get_current_user(
         raise
 
 # ***************************************************************
+# Dependencia para requerir GLOBAL_ADMIN
+# ***************************************************************
+def get_global_admin(current_user: User = Depends(get_current_user)):
+    """Verifica si el usuario actual tiene el rol de global_admin."""
+    # Nota: El rol 'global_admin' tiene ID 1 si seguiste el initial_data.py
+    # Una solución más robusta sería consultar el nombre del rol.
+    
+    # Solución robusta: Consultar el nombre del rol a través de la relación
+    if current_user.role.name != "global_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado. Se requiere rol 'global_admin'."
+        )
+    return current_user
+
+# ***************************************************************
 # 1. Endpoint de Registro (Solo para desarrollo/admin inicial)
 # ***************************************************************
 @router.post("/register", response_model=UserInDB, status_code=status.HTTP_201_CREATED)
@@ -121,3 +137,4 @@ def login_for_access_token(user_in: UserLogin, db: Session = Depends(get_db)):
 def read_users_me(current_user: User = Depends(get_current_user)):
     """Endpoint de prueba para verificar el token y devolver la información del usuario."""
     return current_user
+

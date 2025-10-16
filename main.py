@@ -17,6 +17,7 @@ import app.models.platform # Esto registra Company y Branch
 # 2. Importar los Routers de API
 # ***************************************************************
 from app.api.v1.endpoints import auth
+from app.api.v1.endpoints import platform 
 
 # Inicializar la aplicación FastAPI
 app = FastAPI(
@@ -41,6 +42,12 @@ app.include_router(
     auth.router,
     prefix="/api/v1/auth",
     tags=["Auth & Users"]
+)
+
+app.include_router(
+    platform.router,
+    prefix="/api/v1/platform",
+    tags=["Platform Management"]
 )
 
 # 4. Endpoint de Prueba (Existente)
