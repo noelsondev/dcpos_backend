@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pydantic
+sqlalchemy
+psycopg2-binary  # Driver para PostgreSQL
+python-dotenv    # Para manejar las variables de entorno de forma segura
+python-jose[cryptography]
+passlib[bcrypt]
