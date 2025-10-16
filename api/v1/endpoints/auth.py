@@ -9,6 +9,8 @@ from app.models.auth import User, Role
 from app.core.security import get_password_hash, verify_password, create_access_token, reusable_oauth2, decode_token
 from uuid import uuid4
 from datetime import timedelta
+from app.schemas.auth import UserInDB
+
 
 router = APIRouter()
 
@@ -33,6 +35,18 @@ def get_current_user(
     except HTTPException:
         # Re-lanza las HTTPException de decode_token
         raise
+
+# ***************************************************************
+# Dependencia de Permisos: Company Admin o Global Admin
+# ***************************************************************
+def get_admin_user(current_user: User = Depends(get_current_user)):
+    """Requiere que el usuario sea global_admin o company_admin."""
+    if current_user.role.name not in ["global_admin", "company_admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado. Se requiere rol 'admin'."
+        )
+    return current_user
 
 # ***************************************************************
 # Dependencia para requerir GLOBAL_ADMIN
@@ -135,6 +149,16 @@ def login_for_access_token(user_in: UserLogin, db: Session = Depends(get_db)):
 # ***************************************************************
 @router.get("/me", response_model=UserInDB)
 def read_users_me(current_user: User = Depends(get_current_user)):
-    """Endpoint de prueba para verificar el token y devolver la información del usuario."""
-    return current_user
+    """Obtiene la información del usuario autenticado."""
+    
+    # 1. Convertir el objeto SQLAlchemy a un diccionario.
+    # Usamos .__dict__.copy() para evitar modificar el objeto de SQLAlchemy.
+    user_data = current_user.__dict__.copy()
+    
+    # 2. Añadir el campo calculado 'role_name'
+    user_data["role_name"] = current_user.role.name
+    
+    # 3. Validar el diccionario contra el esquema
+    # (Pydantic sabe cómo manejar los campos extra y omite la relación 'role')
+    return UserInDB.model_validate(user_data)
 
