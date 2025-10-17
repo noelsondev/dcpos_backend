@@ -9,7 +9,7 @@ from uuid import UUID
 from app.database import get_db
 from app.models.auth import User, Role
 from app.models.platform import Company, Branch
-from app.schemas.auth import UserCreate, UserInDB
+from app.schemas.auth import UserCreate, UserInDB, UserUpdate
 from app.core.security import get_password_hash
 # Importar todas las dependencias desde auth.py (donde se definieron)
 from app.api.v1.endpoints.auth import get_current_user
@@ -29,6 +29,44 @@ def get_admin_user(current_user: User = Depends(get_current_user)):
             detail="Acceso denegado. Se requiere rol 'admin' (Global o Company)."
         )
     return current_user
+
+def get_user_and_check_access(
+    user_id: UUID, 
+    db: Session, 
+    admin: User
+) -> User:
+    """
+    Busca un usuario por ID y verifica que el administrador tenga permiso para acceder a él.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado.")
+    
+    # Restricción de Company Admin: Solo puede acceder a usuarios en su compañía.
+    if admin.role.name == "company_admin":
+        if user.company_id != admin.company_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="Acceso denegado. El usuario no pertenece a tu compañía."
+            )
+            
+        # Restricción adicional: Company Admin NO puede modificar a otros Global Admins
+        if user.role.name == "global_admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="Acceso denegado. No puedes modificar un Global Admin."
+            )
+            
+    # Restricción: Nadie puede modificarse a sí mismo a través de este endpoint.
+    # El endpoint /api/v1/auth/me debería manejar las actualizaciones propias.
+    if user.id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Usa /api/v1/auth/me para modificar tu propio perfil."
+        )
+
+    return user
 
 # ***************************************************************
 # 1. Endpoint para Crear Usuario (POST /api/v1/users/)
@@ -163,7 +201,89 @@ def read_users(
     return users_list
 
 # ***************************************************************
-# 3. Endpoint para Leer, Actualizar y Eliminar (Pendientes)
+# 3. Endpoint para Leer Usuario por ID (GET /api/v1/users/{user_id})
 # ***************************************************************
-# Se omiten por brevedad, pero usarían la misma lógica de permisos:
-# Company Admin solo puede afectar a usuarios dentro de su effective_company_id.
+
+@router.get("/{user_id}", response_model=UserInDB, tags=["Users"])
+def read_user(
+    user_id: UUID, 
+    db: Session = Depends(get_db), 
+    admin: User = Depends(get_admin_user)
+):
+    """Obtiene un usuario específico, con restricciones de acceso por compañía."""
+    
+    user = get_user_and_check_access(user_id, db, admin)
+    
+    # Mapear para la respuesta (Pydantic v2 syntax)
+    user_data = user.__dict__.copy()
+    user_data.pop('password_hash', None)
+    user_data["role_name"] = user.role.name
+    
+    return UserInDB.model_validate(user_data)
+
+
+# ***************************************************************
+# 4. Endpoint para Actualizar Usuario (PATCH /api/v1/users/{user_id})
+# ***************************************************************
+
+@router.patch("/{user_id}", response_model=UserInDB, tags=["Users"])
+def update_user(
+    user_id: UUID,
+    user_in: UserUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user)
+):
+    """Actualiza campos de un usuario, con restricciones de acceso/rol."""
+    
+    db_user = get_user_and_check_access(user_id, db, admin)
+    
+    update_data = user_in.model_dump(exclude_unset=True)
+
+    # 1. Manejar el cambio de Contraseña
+    if "password" in update_data:
+        hashed_password = get_password_hash(update_data["password"])
+        update_data["password_hash"] = hashed_password
+        update_data.pop("password") # Eliminar la clave 'password' de los datos a actualizar
+    
+    # 2. Manejar la reasignación de Compañía/Sucursal (Solo Global Admin puede reasignar Company ID)
+    if update_data.get("company_id") and admin.role.name != "global_admin":
+         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo un Global Admin puede reasignar el ID de Compañía.")
+        
+    # 3. Aplicar los cambios a la DB
+    for key, value in update_data.items():
+        if value is not None:
+            setattr(db_user, key, value)
+
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    # 4. Mapear para la respuesta
+    user_data = db_user.__dict__.copy()
+    user_data.pop('password_hash', None)
+    user_data["role_name"] = db_user.role.name
+    
+    return UserInDB.model_validate(user_data)
+
+
+# ***************************************************************
+# 5. Endpoint para Eliminar Usuario (DELETE /api/v1/users/{user_id})
+# ***************************************************************
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Users"])
+def delete_user(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user)
+):
+    """Elimina un usuario (establece is_active=False), con restricciones de acceso/rol."""
+    
+    db_user = get_user_and_check_access(user_id, db, admin)
+    
+    # Se recomienda desactivar en lugar de eliminar, por integridad referencial
+    db_user.is_active = False 
+    
+    db.add(db_user)
+    db.commit()
+    
+    return

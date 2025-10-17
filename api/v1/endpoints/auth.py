@@ -37,18 +37,6 @@ def get_current_user(
         raise
 
 # ***************************************************************
-# Dependencia de Permisos: Company Admin o Global Admin
-# ***************************************************************
-def get_admin_user(current_user: User = Depends(get_current_user)):
-    """Requiere que el usuario sea global_admin o company_admin."""
-    if current_user.role.name not in ["global_admin", "company_admin"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado. Se requiere rol 'admin'."
-        )
-    return current_user
-
-# ***************************************************************
 # Dependencia para requerir GLOBAL_ADMIN
 # ***************************************************************
 def get_global_admin(current_user: User = Depends(get_current_user)):
