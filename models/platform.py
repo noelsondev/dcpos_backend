@@ -2,13 +2,13 @@
 # type: ignore
 import uuid
 from sqlalchemy import Column, String, TIMESTAMP, TEXT, ForeignKey
-from sqlalchemy.orm import relationship # <--- IMPORTANTE: Nueva Importación
+from sqlalchemy.orm import relationship 
 from sqlalchemy.dialects.postgresql import UUID
 from app.database import Base 
 from datetime import datetime
 
 # ***************************************************************
-# 1. Modelo Company
+# 1. Modelo Company (RELACIÓN DE VUELTA A USER)
 # ***************************************************************
 class Company(Base):
     """Modelo para la tabla Company."""
@@ -20,10 +20,10 @@ class Company(Base):
     
     # Relaciones
     branches = relationship("Branch", back_populates="company")
-    # users = relationship("User", back_populates="company") # (Necesita importación de auth.py)
-
+    users = relationship("User", back_populates="company") # <--- DESCOMENTADA
+    
 # ***************************************************************
-# 2. Modelo Branch
+# 2. Modelo Branch (RELACIÓN DE VUELTA A USER)
 # ***************************************************************
 class Branch(Base):
     """Modelo para la tabla Branch."""
@@ -35,4 +35,4 @@ class Branch(Base):
     
     # Relaciones
     company = relationship("Company", back_populates="branches")
-    # users = relationship("User", back_populates="branch") # (Necesita importación de auth.py)
+    users = relationship("User", back_populates="branch") # <--- DESCOMENTADA

@@ -2,7 +2,7 @@
 # type: ignore
 import uuid
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
-from sqlalchemy.orm import relationship # <-- Asegúrate de tener 'relationship' importado
+from sqlalchemy.orm import relationship 
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.database import Base 
@@ -19,7 +19,7 @@ class Role(Base):
     users = relationship("User", back_populates="role")
 
 # ***************************************************************
-# 2. Modelo User (AÑADIR RELACIONES)
+# 2. Modelo User (RELACIONES BIDIRECCIONALES)
 # ***************************************************************
 class User(Base):
     __tablename__ = "user"
@@ -33,9 +33,10 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
 
-    # RELACIONES AÑADIDAS/DESCOMENTADAS:
-    role = relationship("Role", back_populates="users", lazy="joined") # <-- join el rol automáticamente
-    company = relationship("Company") # Nota: Company no tiene relación de vuelta 'users' aún.
-    branch = relationship("Branch")   # Nota: Branch no tiene relación de vuelta 'users' aún.
+    # RELACIONES ACTUALIZADAS: Añadir back_populates
+    role = relationship("Role", back_populates="users", lazy="joined")
+    # Estas relaciones necesitan back_populates en Company y Branch (ver app/models/platform.py)
+    company = relationship("Company", back_populates="users", lazy="joined") 
+    branch = relationship("Branch", back_populates="users", lazy="joined")  
     
     # sessions = relationship("CashSession", back_populates="user")

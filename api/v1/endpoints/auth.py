@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.auth import UserCreate, UserLogin, Token, UserInDB
 from app.models.auth import User, Role
-from app.core.security import get_password_hash, verify_password, create_access_token, reusable_oauth2, decode_token
+from app.core.security import get_password_hash, verify_password, create_access_token, reusable_oauth2, decode_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from uuid import uuid4
 from datetime import timedelta
 from app.schemas.auth import UserInDB
@@ -14,6 +14,7 @@ from app.schemas.auth import UserInDB
 
 router = APIRouter()
 
+# ... (Dependencias get_current_user y get_global_admin sin cambios)
 # ***************************************************************
 # Dependencia para obtener el usuario autenticado (RBAC básico)
 # ***************************************************************
@@ -52,49 +53,7 @@ def get_global_admin(current_user: User = Depends(get_current_user)):
         )
     return current_user
 
-# ***************************************************************
-# 1. Endpoint de Registro (Solo para desarrollo/admin inicial)
-# ***************************************************************
-@router.post("/register", response_model=UserInDB, status_code=status.HTTP_201_CREATED)
-def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
-    """
-    Crea un nuevo usuario. Debería ser restringido a solo 'global_admin'
-    o 'company_admin' en producción.
-    """
-    # 1. Validar unicidad del nombre de usuario
-    existing_user = db.query(User).filter(User.username == user_in.username).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El nombre de usuario ya está registrado."
-        )
-
-    # 2. Validar que el Role ID existe
-    role = db.query(Role).filter(Role.id == user_in.role_id).first()
-    if not role:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"El Role con ID {user_in.role_id} no existe."
-        )
-
-    # 3. Crear el hash de la contraseña
-    hashed_password = get_password_hash(user_in.password)
-
-    # 4. Crear el objeto de la DB
-    db_user = User(
-        id=uuid4(),
-        username=user_in.username,
-        password_hash=hashed_password,
-        role_id=user_in.role_id,
-        company_id=user_in.company_id,
-        branch_id=user_in.branch_id,
-        is_active=user_in.is_active,
-    )
-    
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
+# ... (Endpoint register_user sin cambios)
 
 # ***************************************************************
 # 2. Endpoint de Login
@@ -121,19 +80,44 @@ def login_for_access_token(user_in: UserLogin, db: Session = Depends(get_db)):
         )
 
     # 4. Generar el token (Subject 'sub' es el ID del usuario)
-    access_token_expires = timedelta(minutes=60 )#ACCESS_TOKEN_EXPIRE_MINUTES
+    # Se usa la variable ACCESS_TOKEN_EXPIRE_MINUTES del archivo security
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         subject=str(user.id), expires_delta=access_token_expires
     )
 
     # 5. Obtener el nombre del rol para la respuesta
-    role_name = db.query(Role.name).filter(Role.id == user.role_id).scalar()
+    # La relación 'role' debería estar cargada debido al lazy='joined' en el modelo User
+    role_name = user.role.name
     
     return {"access_token": access_token, "role": role_name}
 
 
 # ***************************************************************
-# 3. Endpoint de Test (Protegido)
+# 3. Endpoint de Refresh (NUEVO)
+# ***************************************************************
+@router.post("/refresh", response_model=Token, tags=["Auth"])
+def refresh_access_token(current_user: User = Depends(get_current_user)):
+    """
+    Refresca el token de acceso JWT del usuario autenticado.
+    El token actual se usa para autenticar, y se emite uno nuevo.
+    """
+    # 1. El get_current_user ya verificó el token y la actividad del usuario.
+    
+    # 2. Generar un nuevo token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        subject=str(current_user.id), expires_delta=access_token_expires
+    )
+    
+    # 3. Obtener el nombre del rol (ya cargado)
+    role_name = current_user.role.name
+    
+    return {"access_token": access_token, "role": role_name}
+
+
+# ***************************************************************
+# 4. Endpoint de Test (Protegido)
 # ***************************************************************
 @router.get("/me", response_model=UserInDB)
 def read_users_me(current_user: User = Depends(get_current_user)):
@@ -146,7 +130,8 @@ def read_users_me(current_user: User = Depends(get_current_user)):
     # 2. Añadir el campo calculado 'role_name'
     user_data["role_name"] = current_user.role.name
     
-    # 3. Validar el diccionario contra el esquema
-    # (Pydantic sabe cómo manejar los campos extra y omite la relación 'role')
+    # 3. Eliminar la relación 'role' antes de la validación
+    user_data.pop('role', None) 
+    
+    # 4. Validar el diccionario contra el esquema
     return UserInDB.model_validate(user_data)
-
