@@ -1,5 +1,5 @@
 # app/main.py
- # type: ignore
+# type: ignore
 
 from fastapi import FastAPI, Depends
 from sqlalchemy import text
@@ -12,6 +12,7 @@ from app.database import get_db, Base, engine
 # Importar los modelos de Auth y Platform (Roles, Users, Companies, Branches)
 import app.models.auth # Esto registra Role y User
 import app.models.platform # Esto registra Company y Branch
+import app.models.inventory # <-- NUEVO: Registra el modelo Product
 
 # ***************************************************************
 # 2. Importar los Routers de API
@@ -19,6 +20,7 @@ import app.models.platform # Esto registra Company y Branch
 from app.api.v1.endpoints import auth
 from app.api.v1.endpoints import platform 
 from app.api.v1.endpoints import users
+from app.api.v1.endpoints import products # <-- NUEVO: Importar el router de productos
 
 # Inicializar la aplicación FastAPI
 app = FastAPI(
@@ -30,7 +32,7 @@ app = FastAPI(
 # Función para crear las tablas al iniciar la app
 def create_tables():
     """Crea todas las tablas de la base de datos si no existen."""
-    # Base.metadata.create_all ahora conoce Role, User, Company, y Branch
+    # Base.metadata.create_all ahora conoce Role, User, Company, Branch, y Product
     Base.metadata.create_all(bind=engine)
 
 # Llamar a la función para crear las tablas (EJECUTAR UNA SOLA VEZ AL INICIO)
@@ -39,30 +41,15 @@ create_tables()
 # ***************************************************************
 # 3. Incluir los Routers
 # ***************************************************************
-app.include_router(
-    auth.router,
-    prefix="/api/v1/auth",
-    tags=["Auth & Users"]
-)
 
-app.include_router(
-    platform.router,
-    prefix="/api/v1/platform",
-    tags=["Platform Management"]
-)
+# Router de Autenticación
+app.include_router(auth.router, tags=["Auth"], prefix="/api/v1/auth")
 
-app.include_router(
-    users.router, 
-    prefix="/api/v1/users",
-    tags=["User Management"]
-)
+# Routers de Plataforma
+app.include_router(platform.router, tags=["Platform"], prefix="/api/v1/platform") 
 
-# 4. Endpoint de Prueba (Existente)
-@app.get("/")
-def read_root(db: Session = Depends(get_db)):
-    """Endpoint de bienvenida con prueba de conexión a la base de datos."""
-    try:
-        db.execute(text("SELECT 1"))
-        return {"status": "ok", "service": "DCPOS API", "db_connection": "successful"}
-    except Exception as e:
-        return {"status": "error", "service": "DCPOS API", "db_connection": f"failed: {e}"}
+# Routers de Usuarios (Administración de usuarios)
+app.include_router(users.router, tags=["Users"], prefix="/api/v1/users")
+
+# Routers de Productos <-- NUEVO
+app.include_router(products.router, tags=["Products"], prefix="/api/v1/products")

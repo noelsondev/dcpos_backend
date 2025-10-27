@@ -1,11 +1,12 @@
 # app/schemas/auth.py
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer # <-- ¡NUEVA IMPORTACIÓN!
 from typing import Optional
 from uuid import UUID
+from datetime import datetime # <-- ¡NUEVA IMPORTACIÓN!
 
 # ***************************************************************
-# 1. Schemas de Autenticación (JWT) (SIN CAMBIOS)
+# 1. Schemas de Autenticación (JWT)
 # ***************************************************************
 class Token(BaseModel):
     """Modelo para la respuesta de un token de acceso."""
@@ -27,6 +28,12 @@ class UserBase(BaseModel):
     is_active: bool = True
     role_id: int # El ID del rol que se le asignará
 
+    # Configuración de Pydantic v2
+    model_config = {
+        "from_attributes": True,
+    }
+
+
 class UserCreate(UserBase):
     """Schema para la creación de un nuevo usuario (incluye password)."""
     password: str = Field(..., min_length=6)
@@ -45,13 +52,19 @@ class UserUpdate(BaseModel):
 class UserInDB(UserBase):
     """Schema para la representación del usuario desde la DB (sin hash)."""
     id: UUID
-    # Campos adicionales para la respuesta (el nombre del rol es más útil que el ID)
     role_name: str 
     company_id: Optional[UUID] = None
     branch_id: Optional[UUID] = None
     
-    class Config:
-        from_attributes = True
+    # 🛑 FIX CRÍTICO: La entrada (input) ahora se define como datetime.
+    # El diccionario 'user_data' tiene un datetime, por eso falla.
+    created_at: datetime 
+
+    # Serializador: convierte el objeto datetime (la entrada) a una cadena ISO 8601 (la salida)
+    @field_serializer('created_at', when_used='always') # Asegurar que se aplique
+    def serialize_datetime(self, value: datetime) -> str:
+        """Convierte datetime de la base de datos a string ISO 8601 para la respuesta."""
+        return value.isoformat() 
 
 class UserLogin(BaseModel):
     """Schema para la solicitud de login."""

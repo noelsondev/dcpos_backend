@@ -1,42 +1,39 @@
 # app/models/auth.py
 # type: ignore
+
 import uuid
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
-from sqlalchemy.orm import relationship 
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, TIMESTAMP
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
+from datetime import datetime
+from app.database import Base
 
-from app.database import Base 
-# Necesitamos importar los modelos de platform para la relación
-from app.models.platform import Company, Branch 
 
-# ***************************************************************
-# 1. Modelo Role (SIN CAMBIOS)
-# ***************************************************************
 class Role(Base):
     __tablename__ = "role"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(50), unique=True, index=True, nullable=False) 
-    users = relationship("User", back_populates="role")
 
-# ***************************************************************
-# 2. Modelo User (RELACIONES BIDIRECCIONALES)
-# ***************************************************************
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), unique=True, index=True, nullable=False)
+
+    # Relación con usuarios
+    users = relationship("User", back_populates="role", cascade="all, delete-orphan")
+
+
 class User(Base):
     __tablename__ = "user"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    
-    company_id = Column(UUID(as_uuid=True), ForeignKey("company.id"), nullable=True) 
-    branch_id = Column(UUID(as_uuid=True), ForeignKey("branch.id"), nullable=True)
-    role_id = Column(Integer, ForeignKey("role.id"), nullable=False)
 
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
-    is_active = Column(Boolean, default=True)
 
-    # RELACIONES ACTUALIZADAS: Añadir back_populates
-    role = relationship("Role", back_populates="users", lazy="joined")
-    # Estas relaciones necesitan back_populates en Company y Branch (ver app/models/platform.py)
-    company = relationship("Company", back_populates="users", lazy="joined") 
-    branch = relationship("Branch", back_populates="users", lazy="joined")  
-    
-    # sessions = relationship("CashSession", back_populates="user")
+    role_id = Column(Integer, ForeignKey("role.id", ondelete="SET NULL"), nullable=True)
+    company_id = Column(UUID(as_uuid=True), ForeignKey("company.id", ondelete="CASCADE"), nullable=True)
+    branch_id = Column(UUID(as_uuid=True), ForeignKey("branch.id", ondelete="SET NULL"), nullable=True)
+
+    is_active = Column(Boolean, default=True)
+    created_at = Column(TIMESTAMP, default=datetime.utcnow)
+
+    # Relaciones bidireccionales sin duplicar backrefs
+    role = relationship("Role", back_populates="users")
+    company = relationship("Company", back_populates="users")
+    branch = relationship("Branch", back_populates="users")
