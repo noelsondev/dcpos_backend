@@ -1,5 +1,5 @@
 # app/core/security.py
- # type: ignore
+# type: ignore
 from datetime import datetime, timedelta, timezone
 from typing import Any, Union
 from jose import jwt, JWTError
@@ -15,14 +15,16 @@ from app.schemas.auth import TokenPayload
 # 1. Configuración de Seguridad
 # ***************************************************************
 
-# Contexto para hashing de contraseñas (usa bcrypt por ser seguro)
+# Contexto para hashing de contraseñas (usa pbkdf2_sha256 por defecto)
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 # Clave secreta para JWT (¡Cambia esto en producción y cárgalo de .env!)
 SECRET_KEY = "SUPER_SECRETA_Y_LARGA_CLAVE_QUE_DEBERIA_ESTAR_EN_ENV"
 ALGORITHM = "HS256"
 
-# Tiempo de expiración del token (por ejemplo, 60 minutos)
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+# Tiempo de expiración del token (por ejemplo, 10 minutos)
+ACCESS_TOKEN_EXPIRE_MINUTES = 10 
+# 🚨 NUEVO: Tiempo de expiración del refresh token (por ejemplo, 7 días)
+REFRESH_TOKEN_EXPIRE_DAYS = 7 
 
 # Esquema de autenticación para FastAPI (para endpoints protegidos)
 reusable_oauth2 = OAuth2PasswordBearer(
@@ -52,6 +54,22 @@ def create_access_token(subject: Union[str, Any], expires_delta: timedelta = Non
     else:
         # Si no se especifica, usa el valor por defecto
         expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    # Datos que se incluirán en el token (payload)
+    to_encode = {"exp": expire, "sub": str(subject)}
+    
+    # Genera el token
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+# 🚨 NUEVO: Función para crear Refresh Token
+def create_refresh_token(subject: Union[str, Any], expires_delta: timedelta = None) -> str:
+    """Crea un nuevo token de refresco JWT."""
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        # Usa el valor por defecto (7 días) si no se especifica
+        expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     
     # Datos que se incluirán en el token (payload)
     to_encode = {"exp": expire, "sub": str(subject)}

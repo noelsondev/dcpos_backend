@@ -11,6 +11,7 @@ from datetime import datetime # <-- ¡NUEVA IMPORTACIÓN!
 class Token(BaseModel):
     """Modelo para la respuesta de un token de acceso."""
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
     role: str
 
