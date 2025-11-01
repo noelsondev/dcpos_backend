@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.auth import UserCreate, UserLogin, Token, UserInDB
-from app.models.auth import User, Role 
+from app.models.auth import User, Role
 # 🚨 Importaciones de seguridad actualizadas
 from app.core.security import (
     get_password_hash, 
@@ -182,3 +182,4 @@ def read_users_me(current_user: User = Depends(get_current_user)):
     # 4. Validar el diccionario.
     # Pydantic valida que created_at es datetime, luego el serializador lo convierte a string para la salida.
     return UserInDB.model_validate(user_data)
+

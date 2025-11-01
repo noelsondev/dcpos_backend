@@ -1,8 +1,10 @@
 # app/schemas/auth.py
+#type: ignore
 
-from pydantic import BaseModel, Field, field_serializer # <-- ¡NUEVA IMPORTACIÓN!
+from pydantic import BaseModel, Field, field_serializer , ConfigDict# <-- ¡NUEVA IMPORTACIÓN!
 from typing import Optional
 from uuid import UUID
+from typing import List
 from datetime import datetime # <-- ¡NUEVA IMPORTACIÓN!
 
 # ***************************************************************
@@ -27,7 +29,7 @@ class UserBase(BaseModel):
     """Base para la creación y lectura de usuarios."""
     username: str = Field(..., max_length=50)
     is_active: bool = True
-    role_id: int # El ID del rol que se le asignará
+    role_id: UUID # El ID del rol que se le asignará
 
     # Configuración de Pydantic v2
     model_config = {
@@ -46,7 +48,7 @@ class UserUpdate(BaseModel):
     """Schema para la actualización de un usuario (campos opcionales)."""
     username: Optional[str] = Field(None, max_length=50)
     is_active: Optional[bool] = None
-    role_id: Optional[int] = None
+    role_id: Optional[UUID] = None
     branch_id: Optional[UUID] = None # Permitir mover el usuario de Branch
     password: Optional[str] = Field(None, min_length=6)
 
@@ -71,3 +73,20 @@ class UserLogin(BaseModel):
     """Schema para la solicitud de login."""
     username: str
     password: str
+
+# 🚨 NUEVO ESQUEMA
+class RoleBase(BaseModel):
+    """Esquema base para representar un Rol (Role)."""
+    name: str
+
+class RoleInDB(RoleBase):
+    """Esquema extendido para devolver el Rol con su ID."""
+    id: UUID
+    
+    # Configuración para que Pydantic pueda leer modelos SQLAlchemy
+    model_config = ConfigDict(from_attributes=True)
+    
+# 🚨 NUEVO ESQUEMA: Lista de Roles
+class RoleList(BaseModel):
+    """Esquema para la respuesta del endpoint que lista todos los roles."""
+    roles: list[RoleInDB]

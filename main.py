@@ -18,9 +18,11 @@ import app.models.inventory # <-- NUEVO: Registra el modelo Product
 # 2. Importar los Routers de API
 # ***************************************************************
 from app.api.v1.endpoints import auth
+from app.api.v1.endpoints import roles
 from app.api.v1.endpoints import platform 
 from app.api.v1.endpoints import users
-from app.api.v1.endpoints import products # <-- NUEVO: Importar el router de productos
+from app.api.v1.endpoints import products
+
 
 # Inicializar la aplicación FastAPI
 app = FastAPI(
@@ -44,6 +46,9 @@ create_tables()
 
 # Router de Autenticación
 app.include_router(auth.router, tags=["Auth"], prefix="/api/v1/auth")
+
+# Router de Roles 
+app.include_router(roles.router, tags=["Roles"], prefix="/api/v1/roles")
 
 # Routers de Plataforma
 app.include_router(platform.router, tags=["Platform"], prefix="/api/v1/platform") 
