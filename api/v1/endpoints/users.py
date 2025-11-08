@@ -170,11 +170,17 @@ def create_user(
     if admin.role.name == "company_admin":
         
         # Un Company Admin SOLO puede crear roles de menor ID/privilegio
-        if role_to_assign.id <= admin.role.id:
+        if role_to_assign == "global_admin" or role_to_assign == "company_admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, 
                 detail=f"Un {admin.role.name} no puede crear un usuario con el rol {role_to_assign.name} o superior."
             )
+        
+        if admin.role.name == "cashier" or admin.role.name == "accountant":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="Acceso denegado. No tienes permisos para crear usuarios."
+            )   
         
         # 🚀 CORRECCIÓN CLAVE: Aseguramos que el company_id se use correctamente.
         admin_company_id = admin.company_id
