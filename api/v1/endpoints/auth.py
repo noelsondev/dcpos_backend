@@ -99,7 +99,7 @@ def login_for_access_token(user_in: UserLogin, db: Session = Depends(get_db)):
           )
 
     # 1. Crear ACCESS TOKEN 
-    access_token_expires = timedelta(seconds=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         subject=str(user.id), expires_delta=access_token_expires
     )
@@ -138,7 +138,7 @@ def refresh_access_token(
     current_user = get_user_from_refresh_token(refresh_token, db)
     
     # 2. Crear nuevo ACCESS TOKEN (Corta duración)
-    access_token_expires = timedelta(seconds=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     new_access_token = create_access_token(
         subject=str(current_user.id), expires_delta=access_token_expires
     )

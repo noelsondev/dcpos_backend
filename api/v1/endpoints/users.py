@@ -20,7 +20,7 @@ router = APIRouter()
 # ***************************************************************
 # DEPENDENCIAS DE PERMISOS Y ACCESO
 # ***************************************************************
-
+# ... (Funciones get_admin_user y get_user_and_check_access sin cambios)
 def get_admin_user(current_user: User = Depends(get_current_user)):
     """Requiere que el usuario sea global_admin o company_admin."""
     # Nota: current_user.role.name funciona porque la relación en el modelo User es lazy="joined"
@@ -84,8 +84,7 @@ def get_user_and_check_access(
     # Si el usuario actual es Global Admin, y el objetivo no era él mismo, el acceso está permitido.
     
     return user
-
-
+# ... (El resto de endpoints de LISTAR, BUSCAR y ACTUALIZAR usuarios sin cambios)
 # ***************************************************************
 # 1. Endpoint para Listar Usuarios (GET /api/v1/users/)
 # ***************************************************************
@@ -177,19 +176,31 @@ def create_user(
                 detail=f"Un {admin.role.name} no puede crear un usuario con el rol {role_to_assign.name} o superior."
             )
         
-        # Forzar la compañía del nuevo usuario a ser la del Company Admin
-        if user_in.company_id and user_in.company_id != admin.company_id:
+        # 🚀 CORRECCIÓN CLAVE: Aseguramos que el company_id se use correctamente.
+        admin_company_id = admin.company_id
+
+        # Si el admin no tiene compañía (Debería ser un 500/error de setup, pero lo manejamos)
+        if admin_company_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Error: El Company Admin actual no tiene una compañía asignada."
+            )
+
+        # Si el usuario NO especificó compañía, forzamos la compañía del administrador.
+        if user_in.company_id is None:
+            user_in.company_id = admin_company_id
+        
+        # Si el usuario ESPECIFICÓ una compañía, debe ser la misma que la del administrador.
+        elif user_in.company_id != admin_company_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Un Company Admin solo puede crear usuarios dentro de su propia compañía."
             )
-        
-        # Si no especificó company_id, se la forzamos
-        user_in.company_id = admin.company_id
             
         # Si se especificó una branch, validar que pertenece a la compañía
         if user_in.branch_id:
-            if not db.query(Branch).filter(Branch.id == user_in.branch_id, Branch.company_id == admin.company_id).first():
+            # Usamos user_in.company_id que ya fue forzado/validado
+            if not db.query(Branch).filter(Branch.id == user_in.branch_id, Branch.company_id == user_in.company_id).first():
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="La sucursal no existe o no pertenece a tu compañía.")
 
     # 4. Validar Company y Branch ID para Global Admin

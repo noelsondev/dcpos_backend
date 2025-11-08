@@ -22,10 +22,19 @@ def get_all_roles(
     _: User = Depends(get_current_user), 
     db: Session = Depends(get_db)
 ):
-    """Temporalmente, devuelve datos dummy para saltar la DB."""
-    # ⚠️ SI ESTO FUNCIONA, EL PROBLEMA ES DB/SQLACHEMY.
+    """
+    Lista todos los roles disponibles en la base de datos.
+    Requiere autenticación.
+    """
     
-    # Datos dummy: Usamos el UUID de ejemplo en el servidor
-    dummy_role = RoleInDB(id="a1b2c3d4-e5f6-7890-1234-567890abcdef", name="Admin Temporal")
+    # 1. Consultar todos los objetos Role en la base de datos
+    roles_from_db = db.query(Role).all()
     
-    return {"roles": [dummy_role]} # Debería ser un diccionario
+    # 2. Convertir la lista de objetos Role a la lista de esquemas RoleInDB
+    # Esto es necesario para asegurar que el formato de salida cumpla con RoleList
+    roles_in_db_format = [
+        RoleInDB(id=str(r.id), name=r.name) for r in roles_from_db
+    ]
+    
+    # 3. Devolver la respuesta en el formato RoleList: {"roles": [...]}
+    return {"roles": roles_in_db_format}
